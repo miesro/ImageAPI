@@ -1,0 +1,41 @@
+name: CI/CD - Build & Deploy to Azure Web App
+
+on:
+  push:
+    branches: [main]
+
+env:
+  ACR_NAME: azure-container-registry-name
+  IMAGE_NAME: indgimageapi                
+  WEBAPP_NAME: azure-app-service-for-container
+  ACR_LOGIN_SERVER: azure-container-registry-name.azurecr.io
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to Azure Container Registry
+        run: az acr login --name $ACR_NAME
+
+      - name: Build Docker image
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/$IMAGE_NAME:latest -f Docker/Dockerfile .
+
+      - name: Push Docker image to ACR
+        run: |
+          docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:latest
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.WEBAPP_NAME }}
+          images: ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
